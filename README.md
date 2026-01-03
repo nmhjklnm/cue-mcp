@@ -82,10 +82,6 @@ Then continue with MCP configuration below.
 
 ### Step 2: Configure the MCP server
 
-### Step 3: Connect your runtime
-
-In the agent/runtime you want to use, type `cue` to trigger connect (or reconnect) and route the collaboration flow to `cue-console`.
-
 <details>
 <summary>Claude Code</summary>
 
@@ -203,6 +199,9 @@ Then configure your MCP client to run:
 </details>
 
 ---
+### Step 3: Connect your runtime
+
+In the agent/runtime you want to use, type `cue` to trigger connect (or reconnect) and route the collaboration flow to `cue-console`.
 
 ## How it works (the contract)
 

@@ -21,9 +21,10 @@ DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 CUE_TODO_CONSTRAINT_TEXT = (
-    "Extra constraint (to avoid omissions): you must add a todo item at the end of todo_list: "
-    "`Use cue MCP to give me a final summary or ask me a question or make a request`, and only mark it as completed "
-    "after you actually call cue()."
+    "Extra constraint (to avoid omissions): add a todo item at the end of todo_list: "
+    "`Before delivering a partial conclusion or final result to the user — and in all cases before finishing your reply for this turn — you MUST call cue(prompt, agent_id, payload?) "
+    "(e.g., summarize, ask clarifying questions, present options, request next info, state risks/assumptions). "
+    "Only mark this todo as completed AFTER you actually call cue().`"
 )
 
 
@@ -60,9 +61,8 @@ async def join() -> str:
     agent_id = generate_name()
     print(f"[MCP] Generated agent_id: {agent_id}")
     return (
-        f"Your agent_id is: {agent_id}\n\n"
-        "Please remember this agent_id: when calling cue(prompt, agent_id), pass it as the agent_id argument.\n"
-        "Before ending this session, call cue. Please use cue MCP to provide a final summary, ask a question, or make a request."
+        f"agent_id={agent_id}\n\n"
+        "Use this agent_id when calling cue(prompt, agent_id)."
     )
 
 
@@ -91,17 +91,17 @@ async def recall(hints: str) -> str:
             agent_id = results[0].agent_id
             print(f"[MCP] Recovered agent_id: {agent_id}")
             return (
-                f"Found your agent_id: {agent_id}\n\n"
-                "When calling cue(prompt, agent_id), use this agent_id."
+                f"agent_id={agent_id}\n\n"
+                "Use this agent_id when calling cue(prompt, agent_id)."
             )
 
         # If not found, generate a new one
         agent_id = generate_name()
         print(f"[MCP] No match found; generated new agent_id: {agent_id}")
         return (
-            f"No matching record found. A new agent_id has been generated for you: {agent_id}\n\n"
-            "When calling cue(prompt, agent_id), use this agent_id.\n"
-            "Before ending this session, call cue(). Please use cue MCP to provide a final summary, ask a question, or make a request."
+            "No matching record found; generated a new agent_id.\n\n"
+            f"agent_id={agent_id}\n\n"
+            "Use this agent_id when calling cue(prompt, agent_id)."
         )
 
 
@@ -153,16 +153,22 @@ async def cue(prompt: str, agent_id: str, payload: str | None = None) -> list[Te
         agent_id: Your identity (from join() or recall()). Must be stable so the system knows who you are.
         payload: Optional structured request (JSON string) to ask for permission/more info/choices. Defaults to None.
 
-            Recommended structure (JSON string):
+            Payload protocol (JSON string):
 
             - required: {"type": "choice" | "confirm" | "form"}
-            - type=choice: {"type":"choice","options":[{"id":"A","label":"..."}, ...],"allow_multiple":false}
-            - type=confirm: {"type":"confirm","text":"...","confirm_label":"Confirm","cancel_label":"Cancel"}
-            - type=form: {"type":"form","fields":[{"id":"title","label":"Title","kind":"text"}, ...]}
+            - choice: {"type":"choice","options":["...",...],"allow_multiple":false}
+            - confirm: {"type":"confirm","text":"...","confirm_label":"Confirm","cancel_label":"Cancel"}
+            - form: {"type":"form","fields":[{"label":"...","kind":"text","options":["...",...],"allow_multiple":false}, ...]}
 
-            Examples:
-            - choice: {"type":"choice","options":[{"id":"A","label":"Continue"},{"id":"B","label":"Stop"}]}
+            Notes:
+            - `payload` must be a JSON string.
+            - For form fields, if `options` is present the UI renders them as clickable buttons.
+            - The UI should also provide an "Other" action per field to insert "<field>:" for free input.
+
+            Minimal examples:
+            - choice: {"type":"choice","options":["Continue","Stop"]}
             - confirm: {"type":"confirm","text":"Continue?"}
+            - form: {"type":"form","fields":[{"label":"Env","options":["prod","staging"]}]}
     """
     try:
         # Create request
@@ -189,7 +195,6 @@ async def cue(prompt: str, agent_id: str, payload: str | None = None) -> list[Te
                     type="text",
                     text=(
                         "The user chose to end the conversation. This session is now over.\n\n"
-                        "⚠️ You do not need to call cue again for this session, but you must follow the rules next time.\n\n"
                         + CUE_TODO_CONSTRAINT_TEXT
                     ),
                 )
@@ -204,7 +209,6 @@ async def cue(prompt: str, agent_id: str, payload: str | None = None) -> list[Te
                     type="text",
                     text=(
                         "The user chose to end the conversation. This session is now over.\n\n"
-                        "⚠️ You do not need to call cue again for this session, but you must follow the rules next time.\n\n"
                         + CUE_TODO_CONSTRAINT_TEXT
                     ),
                 )
@@ -215,9 +219,9 @@ async def cue(prompt: str, agent_id: str, payload: str | None = None) -> list[Te
 
         # Add text
         if user_response.text.strip():
-            result.append(TextContent(type="text", text=f"The user wants to continue and provided the following instruction:\n\n{user_response.text.strip()}"))
+            result.append(TextContent(type="text", text=f"User says:\n\n{user_response.text.strip()}"))
         elif user_response.images:
-            result.append(TextContent(type="text", text="The user wants to continue and attached images:"))
+            result.append(TextContent(type="text", text="User response (images):"))
 
         # Add images
         for img in user_response.images:
@@ -227,9 +231,7 @@ async def cue(prompt: str, agent_id: str, payload: str | None = None) -> list[Te
             TextContent(
                 type="text",
                 text=(
-                    "\n\n⚠️ [Mandatory reminder] Before following the user's instruction, first add a todo item at the end of todo_list: "
-                    "`Use cue MCP to give me a final summary or ask me a question or make a request`. After you call cue(), mark that todo as completed.\n\n"
-                    + "Extra constraint (to avoid omissions): add the todo item mentioned above, then update it to completed after calling cue()."
+                    "\n\n" + CUE_TODO_CONSTRAINT_TEXT
                 ),
             )
         )
