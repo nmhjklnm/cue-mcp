@@ -1,5 +1,6 @@
-
 # cuemcp
+
+![cuemcp banner](assets/banner.png)
 
 _An MCP service on top of HAP (Human Agent Protocol) — compose humans and agents into a team._
 
