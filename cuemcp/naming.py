@@ -1,27 +1,30 @@
 """Conversation name generator."""
-import random
+import secrets
 
 
-ADJECTIVES = [
-    "brave", "swift", "clever", "calm", "wild",
-    "curious", "bright", "gentle", "bold", "keen",
-    "noble", "quiet", "sharp", "warm", "wise",
-]
+C = "bcdfghjklmnpqrstvwxz"
+V = "aeiou"
+CODA = ["", "n", "r", "l", "s", "m", "nd", "st", "rk", "ld"]
 
-ANIMALS = [
-    "fox", "owl", "wolf", "hawk", "panda",
-    "tiger", "deer", "bear", "eagle", "lion",
-    "crane", "otter", "raven", "lynx", "heron",
-]
+
+def syllable() -> str:
+    return secrets.choice(C) + secrets.choice(V) + secrets.choice(CODA)
+
+
+def pure_name(min_len: int = 8, max_len: int = 12) -> str:
+    for _ in range(100):
+        n_syl = secrets.choice([3, 4, 5])
+        s = "".join(syllable() for _ in range(n_syl))
+        s = s[:max_len]
+        if min_len <= len(s) <= max_len and s.isalpha():
+            return s
+    raise RuntimeError("Name generation failed; adjust syllable/length parameters")
 
 
 def generate_name() -> str:
     """Generate a human-friendly conversation name.
 
-    Format: {adjective}-{animal}-{number}
-    Examples: brave-fox-17, swift-owl-42
+    Format: pronounceable lowercase letters only
+    Examples: tavilron, nemosand
     """
-    adj = random.choice(ADJECTIVES)
-    animal = random.choice(ANIMALS)
-    num = random.randint(10, 99)
-    return f"{adj}-{animal}-{num}"
+    return pure_name().lower()

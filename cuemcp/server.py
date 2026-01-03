@@ -50,7 +50,7 @@ mcp.add_middleware(LoggingMiddleware())
 async def join() -> str:
     """Join the conversation and get your agent_id (identity).
 
-    Call this at the start of a conversation to get a human-friendly agent_id, e.g. "brave-fox-17".
+    Call this at the start of a conversation to get a human-friendly agent_id, e.g. "tavilron".
     You must remember this agent_id: when calling cue(), pass it as agent_id so the system knows who you are.
 
     Returns:
