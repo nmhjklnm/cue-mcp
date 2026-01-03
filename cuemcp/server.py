@@ -21,10 +21,8 @@ DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 CUE_TODO_CONSTRAINT_TEXT = (
-    "Extra constraint (to avoid omissions): add a todo item at the end of todo_list: "
-    "`Before delivering a partial conclusion or final result to the user — and in all cases before finishing your reply for this turn — you MUST call cue(prompt, agent_id, payload?) "
-    "(e.g., summarize, ask clarifying questions, present options, request next info, state risks/assumptions). "
-    "Only mark this todo as completed AFTER you actually call cue().`"
+    "`MANDATORY REMINDER`: After completing the user's instruction, you MUST call cue(prompt, agent_id, payload?) again before ending your reply for this turn. "
+    "This is mandatory and cannot be skipped. The cue tool is the only way to continue the conversation; if you do not call it, the user cannot continue interacting. "
 )
 
 
@@ -63,6 +61,8 @@ async def join() -> str:
     return (
         f"agent_id={agent_id}\n\n"
         "Use this agent_id when calling cue(prompt, agent_id)."
+        " You must remember this agent_id: when calling cue(), pass it as agent_id so the system knows who you are."
+        " Before ending this session, call cue. Please use cue MCP to provide a final summary, ask a question, or make a request."
     )
 
 
@@ -149,7 +149,9 @@ async def cue(prompt: str, agent_id: str, payload: str | None = None) -> list[Te
     This tool is the only way to continue the conversation; without calling it, the user cannot interact.
 
     Args:
-        prompt: The message body (plain text) shown to the user. If you need a choice/confirm/form, put it in payload.
+        prompt: The user-facing message (plain text). Use it to summarize progress, ask clarifying questions,
+            present options, request next information, or state risks/assumptions. If you need a structured
+            UI interaction (choice/confirm/form), put it in payload.
         agent_id: Your identity (from join() or recall()). Must be stable so the system knows who you are.
         payload: Optional structured request (JSON string) to ask for permission/more info/choices. Defaults to None.
 
