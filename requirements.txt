@@ -1,0 +1,3 @@
+fastmcp
+sqlmodel
+prompt_toolkit
