@@ -1,7 +1,7 @@
 
 # cuemcp
 
-_Cue MCP server/adapter — a tiny, opinionated bridge between an MCP runtime and a human-in-the-loop UI._
+_An MCP bridge that converges the agent mesh into a human queue._
 
 [![PyPI](https://img.shields.io/pypi/v/cuemcp?label=cuemcp&color=0B7285)](https://pypi.org/project/cuemcp/)
 [![Repo](https://img.shields.io/badge/repo-cue--mcp-111827)](https://github.com/nmhjklnm/cue-mcp)
@@ -11,7 +11,7 @@ _Cue MCP server/adapter — a tiny, opinionated bridge between an MCP runtime an
 
 ## The pitch (10 seconds)
 
-`cuemcp` runs an MCP server that **hands control back to a human**.
+`cuemcp` is the bridge that collapses many-agent concurrency into one human-readable, one-at-a-time decision stream.
 
 It does this via a shared SQLite mailbox:
 
