@@ -1,6 +1,8 @@
 __pycache__/
 *.py[cod]
 .venv/
+.venv*/
+.venv-pypi-check/
 venv/
 .env
 .secret

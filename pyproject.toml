@@ -1,17 +1,34 @@
 [project]
 name = "cuemcp"
-version = "0.1.0"
+version = "0.1.1"
 description = "Cue MCP server/adapter"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
 authors = [{ name = "nmhjklnm" }]
+keywords = ["mcp", "cue", "fastmcp"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Operating System :: OS Independent",
+]
 dependencies = [
   "fastmcp",
   "mcp",
   "sqlmodel",
   "prompt_toolkit",
 ]
+
+[project.urls]
+Homepage = "https://github.com/nmhjklnm/cue-mcp"
+Repository = "https://github.com/nmhjklnm/cue-mcp"
+Issues = "https://github.com/nmhjklnm/cue-mcp/issues"
 
 [project.scripts]
 cuemcp = "cuemcp.server:main"
@@ -20,6 +37,16 @@ cuemcp-sim = "cuemcp.vscode_simulator:main"
 [build-system]
 requires = ["hatchling>=1.24.0"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build]
+exclude = [
+  "/.venv",
+  "/.venv*/",
+  "/venv/",
+  "/dist/",
+  "/.secret",
+  "/.secrets/",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["cuemcp"]
