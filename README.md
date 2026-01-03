@@ -10,9 +10,9 @@ _An MCP service on top of HAP (Human Agent Protocol) — compose humans and agen
 
 ## The pitch (10 seconds)
 
-`cuemcp` is an MCP service built on top of HAP (Human Agent Protocol): it lets you compose MCP-capable humans and agent components into a collaborating team.
+`cuemcp` is an MCP server that gives your agents a single “collaboration inbox” (`cue`/`cue()`), so you can run Claude Code, Cursor, Codex, Windsurf (and other MCP-capable runtimes) with one consistent collaboration flow.
 
-In the long run, the “decision node” in that team can be a human, a human assistant agent, or any other coordinating agent.
+Pair it with [`cue-console`](https://github.com/nmhjklnm/cue-console) for a desktop/mobile UI to view pending collaboration requests and respond from anywhere.
 
 ---
 
@@ -27,7 +27,63 @@ Assumptions:
 - You have `uv`.
 - Your machine can run `uvx`.
 
-### Claude Code
+### Notes
+
+- The current version can occasionally disconnect (for example, the agent replies directly without calling `cue()` at the end).
+- If you get disconnected, type `cue` in the affected runtime to trigger auto-reconnect.
+
+### Step 1: Add the HAP rule to your agent/runtime
+
+Before using `cuemcp`, add a persistent HAP rule so your agent knows it must call `cue()` at the end of every response.
+
+- **Windsurf**: add it to **Global Rules**.
+- **Codex**: add it to `agents.md`.
+- **Claude Code**: add it to `Claude.md`.
+
+<details>
+<summary>Human Agent Protocol (HAP) rules (required)</summary>
+
+```text
+Human Agent Protocol (HAP)
+
+Hard rule: the agent must call the `cue` tool at the end of every response, no exceptions.
+Always use the cue MCP to provide a final summary, ask a question, or request input.
+
+Convention: when the user types `cue`, the user is accepting the HAP rules (supports disconnect + reconnect).
+
+- First-time connection / no agent_id: call join() to obtain an agent_id, then call cue().
+- Reconnect / existing agent_id (e.g. the cue call timed out but the chat continued):
+  when the user types cue again, prefer calling cue() with the existing agent_id;
+  only call join() again if you cannot determine the agent_id.
+
+When to call
+
+- On first message in a new chat (no history): call join().
+- After completing any task: call cue().
+- Before ending any response: call cue().
+
+Forbidden behavior
+
+- Using a self-chosen name without calling join() first.
+- Ending a reply without calling cue().
+- Replacing cue() with "let me know if you need anything else".
+- Assuming there are no follow-ups.
+
+Notes
+
+If you are not sure whether to call it, call it.
+
+Not calling cue() means the user cannot continue the interaction.
+```
+
+</details>
+
+Then continue with MCP configuration below.
+
+### Step 2: Configure the MCP server
+
+<details>
+<summary>Claude Code</summary>
 
 Claude Code can install local `stdio` MCP servers via `claude mcp add`.
 
@@ -35,7 +91,10 @@ Claude Code can install local `stdio` MCP servers via `claude mcp add`.
 claude mcp add --transport stdio cuemcp -- uvx --from cuemcp cuemcp
 ```
 
-### Windsurf
+</details>
+
+<details>
+<summary>Windsurf</summary>
 
 Windsurf reads MCP config from `~/.codeium/mcp_config.json` and uses the Claude Desktop-compatible schema.
 
@@ -50,7 +109,10 @@ Windsurf reads MCP config from `~/.codeium/mcp_config.json` and uses the Claude 
 }
 ```
 
-### Cursor
+</details>
+
+<details>
+<summary>Cursor</summary>
 
 Cursor uses `mcp.json` for configuration, and the Cursor CLI (`cursor-agent`) can list and manage servers. The CLI uses the same MCP configuration as the editor.
 
@@ -72,7 +134,10 @@ Create an `mcp.json` in your project (Cursor discovers configs with project → 
 }
 ```
 
-### VS Code
+</details>
+
+<details>
+<summary>VS Code</summary>
 
 VS Code MCP configuration uses a JSON file with `servers` and optional `inputs`.
 
@@ -88,7 +153,10 @@ VS Code MCP configuration uses a JSON file with `servers` and optional `inputs`.
 }
 ```
 
-### Codex
+</details>
+
+<details>
+<summary>Codex</summary>
 
 Codex can register a local stdio MCP server via the CLI:
 
@@ -98,7 +166,10 @@ codex mcp add cuemcp -- uvx --from cuemcp cuemcp
 
 For deeper configuration, Codex stores MCP servers in `~/.codex/config.toml`.
 
-### Gemini CLI
+</details>
+
+<details>
+<summary>Gemini CLI</summary>
 
 Gemini CLI can add a local stdio MCP server via:
 
@@ -106,7 +177,10 @@ Gemini CLI can add a local stdio MCP server via:
 gemini mcp add cuemcp uvx --from cuemcp cuemcp
 ```
 
-### Fallback: run from source (no `uvx`)
+</details>
+
+<details>
+<summary>Fallback: run from source (no `uvx`)</summary>
 
 If you don’t want to rely on `uvx` (for example, you prefer pinned source or local hacking), you can run `cuemcp` from a cloned repository.
 
@@ -121,6 +195,8 @@ Then configure your MCP client to run:
 
 - `command`: `cuemcp`
 - `args`: `[]`
+
+</details>
 
 ---
 
