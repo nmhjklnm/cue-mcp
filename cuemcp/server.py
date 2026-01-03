@@ -12,8 +12,8 @@ from fastmcp.server.middleware import Middleware, MiddlewareContext
 from mcp.types import TextContent, ImageContent
 from sqlmodel import Session, create_engine, select, SQLModel
 
-from models import CueRequest, CueResponse, RequestStatus, UserResponse
-from naming import generate_name
+from .models import CueRequest, CueResponse, RequestStatus, UserResponse
+from .naming import generate_name
 
 # 配置
 DB_PATH = Path.home() / ".cue/cue.db"
@@ -238,7 +238,11 @@ async def cue(prompt: str, agent_id: str, payload: str | None = None) -> list[Te
         return [TextContent(type="text", text=f"错误: {str(e)}")]
 
 
-if __name__ == "__main__":
+def main() -> None:
     print(f"[MCP] 数据库路径: {DB_PATH}")
     print("[MCP] Cue MCP Server 已启动")
     mcp.run()
+
+
+if __name__ == "__main__":
+    main()

@@ -11,8 +11,8 @@ from pathlib import Path
 
 from sqlmodel import Session, create_engine, select, SQLModel
 
-from models import CueRequest, CueResponse, ImageContent, RequestStatus, UserResponse
-from terminal_render import render_payload
+from .models import CueRequest, CueResponse, ImageContent, RequestStatus, UserResponse
+from .terminal_render import render_payload
 
 try:
     from prompt_toolkit import PromptSession
@@ -171,7 +171,7 @@ async def handle_request(request: CueRequest):
         print("✅ 已发送结束信号\n")
 
 
-async def main():
+async def _amain() -> None:
     """主函数"""
     print("🚀 Windsurf Ask Continue - 客户端模拟器")
     print("=" * 60)
@@ -182,5 +182,9 @@ async def main():
         print("\n\n👋 已停止监听")
 
 
+def main() -> None:
+    asyncio.run(_amain())
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
