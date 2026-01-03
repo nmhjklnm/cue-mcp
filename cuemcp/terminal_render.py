@@ -10,7 +10,7 @@ def render_payload(payload: str, *, debug: bool = False) -> str:
         return payload
 
     if not isinstance(parsed, dict):
-        return _maybe_debug("结构化数据", parsed, debug=debug)
+        return _maybe_debug("Structured data", parsed, debug=debug)
 
     ptype = parsed.get("type")
 
@@ -21,7 +21,7 @@ def render_payload(payload: str, *, debug: bool = False) -> str:
     if ptype == "form":
         return _render_form(parsed, debug=debug)
 
-    return _maybe_debug(f"结构化请求（type={ptype or 'unknown'}）", parsed, debug=debug)
+    return _maybe_debug(f"Structured request (type={ptype or 'unknown'})", parsed, debug=debug)
 
 
 def _render_choice(parsed: dict[str, Any], *, debug: bool) -> str:
@@ -29,7 +29,7 @@ def _render_choice(parsed: dict[str, Any], *, debug: bool) -> str:
     allow_multiple = bool(parsed.get("allow_multiple", False))
 
     lines: list[str] = []
-    title = "请选择（可多选）:" if allow_multiple else "请选择："
+    title = "Please choose (multiple allowed):" if allow_multiple else "Please choose:"
     lines.append(title)
 
     if isinstance(options, list) and options:
@@ -38,7 +38,7 @@ def _render_choice(parsed: dict[str, Any], *, debug: bool) -> str:
                 oid = str(opt.get("id", "")).strip()
                 label = str(opt.get("label", "")).strip()
                 if oid and label:
-                    lines.append(f"{oid}：{label}")
+                    lines.append(f"{oid}: {label}")
                 elif oid:
                     lines.append(f"{oid}")
                 elif label:
@@ -48,20 +48,20 @@ def _render_choice(parsed: dict[str, Any], *, debug: bool) -> str:
             else:
                 lines.append(f"- {opt}")
     else:
-        lines.append("(无选项)")
+        lines.append("(no options)")
 
     return _join_with_debug("\n".join(lines), parsed, debug=debug)
 
 
 def _render_confirm(parsed: dict[str, Any], *, debug: bool) -> str:
     text = str(parsed.get("text", "")).strip()
-    confirm_label = str(parsed.get("confirm_label", "确认")).strip() or "确认"
-    cancel_label = str(parsed.get("cancel_label", "取消")).strip() or "取消"
+    confirm_label = str(parsed.get("confirm_label", "Confirm")).strip() or "Confirm"
+    cancel_label = str(parsed.get("cancel_label", "Cancel")).strip() or "Cancel"
 
-    lines = ["需要你确认："]
+    lines = ["Confirmation required:"]
     if text:
         lines.append(text)
-    lines.append(f"选项：{confirm_label} / {cancel_label}")
+    lines.append(f"Options: {confirm_label} / {cancel_label}")
 
     return _join_with_debug("\n".join(lines), parsed, debug=debug)
 
@@ -69,7 +69,7 @@ def _render_confirm(parsed: dict[str, Any], *, debug: bool) -> str:
 def _render_form(parsed: dict[str, Any], *, debug: bool) -> str:
     fields = parsed.get("fields")
 
-    lines: list[str] = ["请填写以下信息："]
+    lines: list[str] = ["Please fill in the following:"]
 
     if isinstance(fields, list) and fields:
         for f in fields:
@@ -78,13 +78,13 @@ def _render_form(parsed: dict[str, Any], *, debug: bool) -> str:
                 label = str(f.get("label", "")).strip()
                 kind = str(f.get("kind", "")).strip()
 
-                name = label or fid or "字段"
-                suffix = f"（{kind}）" if kind else ""
+                name = label or fid or "Field"
+                suffix = f" ({kind})" if kind else ""
                 lines.append(f"- {name}{suffix}")
             else:
                 lines.append(f"- {f}")
     else:
-        lines.append("(无字段)")
+        lines.append("(no fields)")
 
     return _join_with_debug("\n".join(lines), parsed, debug=debug)
 

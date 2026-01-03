@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""客户端模拟器交互脚本
-轮询数据库，处理用户请求
+"""Client simulator interactive script.
+
+Polls the database and handles user requests.
 """
 import asyncio
 import base64
@@ -22,7 +23,7 @@ try:
 except Exception:
     _PROMPT_TOOLKIT_AVAILABLE = False
 
-# 配置
+# Configuration
 DB_PATH = Path.home() / ".cue/cue.db"
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 
@@ -32,7 +33,7 @@ SQLModel.metadata.create_all(engine)
 
 def _read_multiline_text() -> str:
     if not _PROMPT_TOOLKIT_AVAILABLE:
-        print("(提示：可选安装 prompt_toolkit 以支持多行编辑：pip install prompt_toolkit)")
+        print("(Tip: optionally install prompt_toolkit for multiline editing: pip install prompt_toolkit)")
         try:
             return input("> ").strip()
         except EOFError:
@@ -62,8 +63,8 @@ def _read_multiline_text() -> str:
 
 
 def _read_image_paths() -> list[str]:
-    """读取图片路径（支持拖拽），返回路径列表。"""
-    print("📎 图片（可选）：输入图片路径（可拖拽文件到终端），多张用逗号分隔；直接回车跳过")
+    """Read image paths (supports drag & drop) and return a list of paths."""
+    print("📎 Images (optional): enter image paths (you can drag files into the terminal), separate multiple with commas; press Enter to skip")
     try:
         raw = input("> ").strip()
     except EOFError:
@@ -81,20 +82,20 @@ def _encode_images(paths: list[str]) -> list[ImageContent]:
     for p in paths:
         path = Path(p).expanduser()
         if not path.exists() or not path.is_file():
-            print(f"⚠️ 跳过不存在的文件: {path}")
+            print(f"⚠️ Skipping missing file: {path}")
             continue
 
         mime, _ = mimetypes.guess_type(str(path))
         if not mime:
             mime = "application/octet-stream"
         if not mime.startswith("image/"):
-            print(f"⚠️ 跳过非图片文件({mime}): {path}")
+            print(f"⚠️ Skipping non-image file ({mime}): {path}")
             continue
 
         try:
             data = path.read_bytes()
         except Exception as e:
-            print(f"⚠️ 读取失败: {path} ({e})")
+            print(f"⚠️ Failed to read: {path} ({e})")
             continue
 
         b64 = base64.b64encode(data).decode("utf-8")
@@ -103,13 +104,13 @@ def _encode_images(paths: list[str]) -> list[ImageContent]:
 
 
 async def poll_requests():
-    """轮询数据库查找待处理请求"""
-    print("🔍 开始监听请求...")
-    print(f"📁 数据库: {DB_PATH}\n")
+    """Poll the database for pending requests."""
+    print("🔍 Listening for requests...")
+    print(f"📁 Database: {DB_PATH}\n")
 
     while True:
         with Session(engine) as session:
-            # 查找 pending 状态的请求
+            # Find the first pending request
             request = session.exec(
                 select(CueRequest)
                 .where(CueRequest.status == RequestStatus.PENDING)
@@ -117,37 +118,37 @@ async def poll_requests():
             ).first()
 
             if request:
-                # 处理请求
+                # Handle request
                 await handle_request(request)
 
-        # 每 500ms 检查一次
+        # Check every 500ms
         await asyncio.sleep(0.5)
 
 
 async def handle_request(request: CueRequest):
-    """处理单个请求"""
+    """Handle a single request."""
     print("=" * 60)
-    print(f"📨 收到新请求: {request.request_id}")
-    print(f"📝 内容: {request.prompt}")
+    print(f"📨 New request: {request.request_id}")
+    print(f"📝 Prompt: {request.prompt}")
     if request.payload:
         try:
             print(render_payload(request.payload, debug=False))
         except Exception:
-            print("🧩 Payload(原始):")
+            print("🧩 Payload (raw):")
             print(request.payload)
     print("=" * 60)
 
-    # 获取用户输入
-    print("\n💬 请输入你的回复（Enter 提交；Ctrl+J 或 Alt+Enter 换行）:")
+    # Get user input
+    print("\n💬 Enter your reply (Enter to submit; Ctrl+J or Alt+Enter for newline):")
     user_text = await asyncio.to_thread(_read_multiline_text)
 
     image_paths = await asyncio.to_thread(_read_image_paths)
     images = _encode_images(image_paths)
 
-    # 创建响应对象
+    # Create response object
     user_response = UserResponse(text=user_text, images=images)
 
-    # 写入响应
+    # Write response
     with Session(engine) as session:
         response = CueResponse.create(
             request_id=request.request_id,
@@ -156,7 +157,7 @@ async def handle_request(request: CueRequest):
         )
         session.add(response)
 
-        # 更新请求状态
+        # Update request status
         db_request = session.get(CueRequest, request.id)
         if db_request:
             db_request.status = RequestStatus.COMPLETED
@@ -166,20 +167,20 @@ async def handle_request(request: CueRequest):
         session.commit()
 
     if user_text:
-        print(f"✅ 已发送响应: {user_text[:50]}{'...' if len(user_text) > 50 else ''}\n")
+        print(f"✅ Response sent: {user_text[:50]}{'...' if len(user_text) > 50 else ''}\n")
     else:
-        print("✅ 已发送结束信号\n")
+        print("✅ End signal sent\n")
 
 
 async def _amain() -> None:
-    """主函数"""
-    print("🚀 Windsurf Ask Continue - 客户端模拟器")
+    """Main function."""
+    print("🚀 Windsurf Ask Continue - Client Simulator")
     print("=" * 60)
 
     try:
         await poll_requests()
     except KeyboardInterrupt:
-        print("\n\n👋 已停止监听")
+        print("\n\n👋 Stopped listening")
 
 
 def main() -> None:

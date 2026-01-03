@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Cue MCP Server
-使用共享 SQLite 数据库进行通信
+Communicates via a shared SQLite database
 """
 import asyncio
 import uuid
@@ -15,31 +15,32 @@ from sqlmodel import Session, create_engine, select, SQLModel
 from .models import CueRequest, CueResponse, RequestStatus, UserResponse
 from .naming import generate_name
 
-# 配置
+# Configuration
 DB_PATH = Path.home() / ".cue/cue.db"
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 CUE_TODO_CONSTRAINT_TEXT = (
-    "额外约束（为了避免遗漏）：你必须在 todo_list 末尾新增一条待办任务："
-    "`使用 cue mcp 给我最终的总结或者向我提问或者请求`，在你真正调用 cue() 后再标记为 completed。"
+    "Extra constraint (to avoid omissions): you must add a todo item at the end of todo_list: "
+    "`Use cue MCP to give me a final summary or ask me a question or make a request`, and only mark it as completed "
+    "after you actually call cue()."
 )
 
 
-# 创建引擎
+# Create engine
 engine = create_engine(DATABASE_URL, echo=False)
 SQLModel.metadata.create_all(engine)
 
-# 创建 FastMCP 服务器
+# Create FastMCP server
 mcp = FastMCP("cue")
 
 
 class LoggingMiddleware(Middleware):
-    """日志中间件"""
+    """Logging middleware"""
     async def on_call_tool(self, context: MiddlewareContext, call_next):
-        print(f"[MCP] 调用工具: {context.method}")
+        print(f"[MCP] Calling tool: {context.method}")
         result = await call_next(context)
-        print(f"[MCP] 工具完成: {context.method}")
+        print(f"[MCP] Tool finished: {context.method}")
         return result
 
 
@@ -48,37 +49,37 @@ mcp.add_middleware(LoggingMiddleware())
 
 @mcp.tool()
 async def join() -> str:
-    """加入对话，获取你的 agent_id（身份标识）。
-    
-    在对话开始时调用此工具，获取一个人性化的 agent_id，如 "brave-fox-17"。
-    你必须记住这个 agent_id：后续调用 cue() 时需要传入它，用来告诉系统“你是谁”。
-    
+    """Join the conversation and get your agent_id (identity).
+
+    Call this at the start of a conversation to get a human-friendly agent_id, e.g. "brave-fox-17".
+    You must remember this agent_id: when calling cue(), pass it as agent_id so the system knows who you are.
+
     Returns:
-        一段给你看的说明消息（包含 agent_id）。
+        A short message for you (includes agent_id).
     """
     agent_id = generate_name()
-    print(f"[MCP] 生成 agent_id: {agent_id}")
+    print(f"[MCP] Generated agent_id: {agent_id}")
     return (
-        f"你的 agent_id 是: {agent_id}\n\n"
-        "请牢记这个 agent_id：后续调用 cue(prompt, agent_id) 时，agent_id 参数就是你的身份标识。\n"
-        "请在当前会话结束前调用 cue，请必须使用 cue mcp 给我最终的总结或者向我提问或者请求。"
+        f"Your agent_id is: {agent_id}\n\n"
+        "Please remember this agent_id: when calling cue(prompt, agent_id), pass it as the agent_id argument.\n"
+        "Before ending this session, call cue. Please use cue MCP to provide a final summary, ask a question, or make a request."
     )
 
 
 @mcp.tool()
 async def recall(hints: str) -> str:
-    """根据线索找回之前的 agent_id。
-    
-    如果你忘记了自己的 agent_id，可以用此工具通过描述之前做过的事情来找回。
-    
+    """Recover a previous agent_id using hints.
+
+    If you forgot your agent_id, describe something you did before and this tool will try to find it.
+
     Args:
-        hints: 你记得的任何线索，如 "用户让我重构登录模块" 或 "讨论过数据库设计"
-    
+        hints: Any hint you remember, e.g. "refactored the login module" or "discussed database design".
+
     Returns:
-        一段给你看的说明消息（包含 agent_id）
+        A short message for you (includes agent_id).
     """
     with Session(engine) as session:
-        # 搜索 prompt 字段包含 hints 关键词的记录
+        # Search records where prompt contains the hints
         results = session.exec(
             select(CueRequest)
             .where(CueRequest.agent_id != "")
@@ -88,24 +89,24 @@ async def recall(hints: str) -> str:
         
         if results:
             agent_id = results[0].agent_id
-            print(f"[MCP] 找回 agent_id: {agent_id}")
+            print(f"[MCP] Recovered agent_id: {agent_id}")
             return (
-                f"找到你的 agent_id: {agent_id}\n\n"
-                "后续调用 cue(prompt, agent_id) 时，请填写这个 agent_id。"
+                f"Found your agent_id: {agent_id}\n\n"
+                "When calling cue(prompt, agent_id), use this agent_id."
             )
-        
-        # 找不到则生成新名字
+
+        # If not found, generate a new one
         agent_id = generate_name()
-        print(f"[MCP] 未找到匹配，生成新 agent_id: {agent_id}")
+        print(f"[MCP] No match found; generated new agent_id: {agent_id}")
         return (
-            f"未找到匹配的记录，已为你生成新的 agent_id: {agent_id}\n\n"
-            "调用 cue(prompt, agent_id) 时，请填写这个 agent_id。\n"
-            "请在当前会话结束前调用 cue()，请必须使用 cue mcp 给我最终的总结或者向我提问或者请求。"
+            f"No matching record found. A new agent_id has been generated for you: {agent_id}\n\n"
+            "When calling cue(prompt, agent_id), use this agent_id.\n"
+            "Before ending this session, call cue(). Please use cue MCP to provide a final summary, ask a question, or make a request."
         )
 
 
 async def wait_for_response(request_id: str, timeout: float = 600.0) -> CueResponse:
-    """轮询数据库等待响应"""
+    """Poll the database and wait for a response."""
     start_time = asyncio.get_event_loop().time()
 
     while True:
@@ -117,54 +118,54 @@ async def wait_for_response(request_id: str, timeout: float = 600.0) -> CueRespo
             if response:
                 return response
 
-        # 检查超时
+        # Check timeout
         if asyncio.get_event_loop().time() - start_time > timeout:
-            raise TimeoutError(f"等待响应超时: {request_id}")
+            raise TimeoutError(f"Timed out waiting for response: {request_id}")
 
-        # 等待 500ms 后重试
+        # Retry after 500ms
         await asyncio.sleep(0.5)
 
 
 @mcp.tool()
 async def cue(prompt: str, agent_id: str, payload: str | None = None) -> list[TextContent | ImageContent]:
-    """⚠️ 【最高优先级 - 强制执行】给用户一个 cue，等待响应。
+    """⚠️ [Highest priority - mandatory] Send the user a cue and wait for a response.
 
-    🔴 核心规则（无任何例外）：
-    1. 你必须在【每次回复结束前】调用此工具
-    2. 你必须在无任何对话历史时先调用 join() 获取名字，再调用此工具
-    3. 你必须在【完成任何任务后】调用此工具
-    4. 你必须在【回答任何问题后】调用此工具
-    5. 即使你认为对话应该结束，也必须调用此工具让用户决定
+    Core rules (no exceptions):
+    1. You must call this tool before ending every reply.
+    2. If there is no conversation history, call join() first to get an agent_id, then call this tool.
+    3. You must call this tool after completing any task.
+    4. You must call this tool after answering any question.
+    5. Even if you think the conversation should end, you must call this tool and let the user decide.
 
-    🔴 绝对禁止的行为：
-    - 禁止在不调用此工具的情况下结束回复
-    - 禁止假设用户没有后续需求
-    - 禁止在回复末尾说"有问题请告诉我"而不调用此工具
-    - 禁止以任何理由跳过调用此工具
+    Forbidden behaviors:
+    - Do not end your reply without calling this tool.
+    - Do not assume the user has no follow-up.
+    - Do not end with "let me know if you have questions" instead of calling this tool.
+    - Do not skip calling this tool for any reason.
 
-    🔴 执行顺序：
-    join() 获取 agent_id → 回复内容 → cue(prompt, agent_id) → 等待用户输入 → 重复
+    Execution order:
+    join() -> reply -> cue(prompt, agent_id) -> wait for user input -> repeat
 
-    此工具是对话继续的唯一方式，不调用则用户无法继续交互。
+    This tool is the only way to continue the conversation; without calling it, the user cannot interact.
 
     Args:
-        prompt: 给用户的回复/总结/消息正文（纯文本）。如果你需要用户做选择/确认/填写表单等，请把结构化请求放到 payload。
-        agent_id: 你的身份标识（通过 join() 或 recall() 获取）。必须稳定传入，用来告诉系统“你是谁”。
-        payload: 可选结构化请求（JSON 字符串）。用于向用户请求授权/更多信息/选择等。不填则为 None。
+        prompt: The message body (plain text) shown to the user. If you need a choice/confirm/form, put it in payload.
+        agent_id: Your identity (from join() or recall()). Must be stable so the system knows who you are.
+        payload: Optional structured request (JSON string) to ask for permission/more info/choices. Defaults to None.
 
-            推荐结构（JSON 对象序列化后的字符串）：
+            Recommended structure (JSON string):
 
-            - 必填：{"type": "choice" | "confirm" | "form"}
-            - type=choice：{"type":"choice","options":[{"id":"A","label":"..."}, ...],"allow_multiple":false}
-            - type=confirm：{"type":"confirm","text":"...","confirm_label":"确认","cancel_label":"取消"}
-            - type=form：{"type":"form","fields":[{"id":"title","label":"标题","kind":"text"}, ...]}
+            - required: {"type": "choice" | "confirm" | "form"}
+            - type=choice: {"type":"choice","options":[{"id":"A","label":"..."}, ...],"allow_multiple":false}
+            - type=confirm: {"type":"confirm","text":"...","confirm_label":"Confirm","cancel_label":"Cancel"}
+            - type=form: {"type":"form","fields":[{"id":"title","label":"Title","kind":"text"}, ...]}
 
-            示例：
-            - choice: {"type":"choice","options":[{"id":"A","label":"继续"},{"id":"B","label":"停止"}]}
-            - confirm: {"type":"confirm","text":"是否继续？"}
+            Examples:
+            - choice: {"type":"choice","options":[{"id":"A","label":"Continue"},{"id":"B","label":"Stop"}]}
+            - confirm: {"type":"confirm","text":"Continue?"}
     """
     try:
-        # 创建请求
+        # Create request
         request_id = f"req_{uuid.uuid4().hex[:12]}"
         request = CueRequest(
             request_id=request_id,
@@ -177,9 +178,9 @@ async def cue(prompt: str, agent_id: str, payload: str | None = None) -> list[Te
             session.add(request)
             session.commit()
 
-        print(f"[MCP] 请求已创建: {request_id}")
+        print(f"[MCP] Request created: {request_id}")
 
-        # 等待响应
+        # Wait for response
         db_response = await wait_for_response(request_id)
 
         if db_response.cancelled:
@@ -187,14 +188,14 @@ async def cue(prompt: str, agent_id: str, payload: str | None = None) -> list[Te
                 TextContent(
                     type="text",
                     text=(
-                        "用户选择结束对话。本次对话结束。\n\n"
-                        "⚠️ 本次无需再调用 cue，但下次对话仍需遵循规则。\n\n"
+                        "The user chose to end the conversation. This session is now over.\n\n"
+                        "⚠️ You do not need to call cue again for this session, but you must follow the rules next time.\n\n"
                         + CUE_TODO_CONSTRAINT_TEXT
                     ),
                 )
             ]
 
-        # 解析响应
+        # Parse response
         user_response = db_response.response
 
         if not user_response.text.strip() and not user_response.images:
@@ -202,23 +203,23 @@ async def cue(prompt: str, agent_id: str, payload: str | None = None) -> list[Te
                 TextContent(
                     type="text",
                     text=(
-                        "用户选择结束对话。本次对话结束。\n\n"
-                        "⚠️ 本次无需再调用 cue，但下次对话仍需遵循规则。\n\n"
+                        "The user chose to end the conversation. This session is now over.\n\n"
+                        "⚠️ You do not need to call cue again for this session, but you must follow the rules next time.\n\n"
                         + CUE_TODO_CONSTRAINT_TEXT
                     ),
                 )
             ]
 
-        # 构建结果
+        # Build result
         result = []
 
-        # 添加文本
+        # Add text
         if user_response.text.strip():
-            result.append(TextContent(type="text", text=f"用户希望继续，并提供了以下指令：\n\n{user_response.text.strip()}"))
+            result.append(TextContent(type="text", text=f"The user wants to continue and provided the following instruction:\n\n{user_response.text.strip()}"))
         elif user_response.images:
-            result.append(TextContent(type="text", text="用户希望继续，并附加了图片："))
+            result.append(TextContent(type="text", text="The user wants to continue and attached images:"))
 
-        # 添加图片
+        # Add images
         for img in user_response.images:
             result.append(ImageContent(type="image", data=img.base64_data, mimeType=img.mime_type))
 
@@ -226,21 +227,21 @@ async def cue(prompt: str, agent_id: str, payload: str | None = None) -> list[Te
             TextContent(
                 type="text",
                 text=(
-                    "\n\n⚠️【强制提醒】请先在 todo_list 末尾新增一条待办任务：`使用 cue mcp 给我最终的总结或者向我提问或者请求`，再开始执行用户指令。完成后你【必须】再次调用 cue 工具，这是强制要求，不可跳过！\n\n"
-                    + "额外约束（为了避免遗漏）：你必须在 todo_list 末尾新增一条待办任务："
-                    + "`使用 cue mcp 给我最终的总结或者向我提问或者请求`。你调用 cue() 后，再把这条待办更新为 completed。"
+                    "\n\n⚠️ [Mandatory reminder] Before following the user's instruction, first add a todo item at the end of todo_list: "
+                    "`Use cue MCP to give me a final summary or ask me a question or make a request`. After you call cue(), mark that todo as completed.\n\n"
+                    + "Extra constraint (to avoid omissions): add the todo item mentioned above, then update it to completed after calling cue()."
                 ),
             )
         )
         return result
 
     except Exception as e:
-        return [TextContent(type="text", text=f"错误: {str(e)}")]
+        return [TextContent(type="text", text=f"Error: {str(e)}")]
 
 
 def main() -> None:
-    print(f"[MCP] 数据库路径: {DB_PATH}")
-    print("[MCP] Cue MCP Server 已启动")
+    print(f"[MCP] Database path: {DB_PATH}")
+    print("[MCP] Cue MCP Server started")
     mcp.run()
 
 

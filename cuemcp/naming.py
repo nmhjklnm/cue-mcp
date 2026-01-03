@@ -1,4 +1,4 @@
-"""会话名生成模块"""
+"""Conversation name generator."""
 import random
 
 
@@ -16,10 +16,10 @@ ANIMALS = [
 
 
 def generate_name() -> str:
-    """生成人性化的会话名
-    
-    格式: {形容词}-{动物}-{数字}
-    示例: brave-fox-17, swift-owl-42
+    """Generate a human-friendly conversation name.
+
+    Format: {adjective}-{animal}-{number}
+    Examples: brave-fox-17, swift-owl-42
     """
     adj = random.choice(ADJECTIVES)
     animal = random.choice(ANIMALS)
