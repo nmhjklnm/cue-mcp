@@ -21,8 +21,8 @@ DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 CUE_TODO_CONSTRAINT_TEXT = (
-    "`MANDATORY REMINDER`: After completing the user's instruction, you MUST call cue(prompt, agent_id, payload?) again before ending your reply for this turn. "
-    "This is mandatory and cannot be skipped. The cue tool is the only way to continue the conversation; if you do not call it, the user cannot continue interacting. "
+    "重要：【Human Agent Protocol 强制遵循】你必须遵循Human Agent Protocol协议：在每次完成我的指令之前或回答问题时，必须向我 cue（即调用 cue(prompt, agent_id, payload?) 让我继续输入）。未实际调用 cue之前，不得结束回复；\n\n"
+    "重要：【todo_list 强制检查】开始执行此条用户指令前，请检查当前 todo_list，并确保最后一条任务为'用 cue发送{{用户这条指令所对应的可能的响应}}'。 若不存在，必须立即补充添加。"
 )
 
 
@@ -128,7 +128,8 @@ async def wait_for_response(request_id: str, timeout: float = 600.0) -> CueRespo
 
 @mcp.tool()
 async def cue(prompt: str, agent_id: str, payload: str | None = None) -> list[TextContent | ImageContent]:
-    """⚠️ [Highest priority - mandatory] Send the user a cue and wait for a response.
+    """
+    ⚠️ [Highest priority - mandatory] Send the user a cue and wait for a response.
 
     Core rules (no exceptions):
     1. You must call this tool before ending every reply.
@@ -221,9 +222,9 @@ async def cue(prompt: str, agent_id: str, payload: str | None = None) -> list[Te
 
         # Add text
         if user_response.text.strip():
-            result.append(TextContent(type="text", text=f"User says:\n\n{user_response.text.strip()}"))
+            result.append(TextContent(type="text", text=f"用户希望继续，并提供了以下指令：\n\n{user_response.text.strip()}"))
         elif user_response.images:
-            result.append(TextContent(type="text", text="User response (images):"))
+            result.append(TextContent(type="text", text="用户希望继续，并附加了图片："))
 
         # Add images
         for img in user_response.images:

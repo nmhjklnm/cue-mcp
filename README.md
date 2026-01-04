@@ -44,36 +44,36 @@ Before using `cuemcp`, add a persistent HAP rule so your agent knows it must cal
 <summary>Human Agent Protocol (HAP) rules (required)</summary>
 
 ```text
-Human Agent Protocol (HAP)
+# Human Agent Protocol
 
-Hard rule: the agent must call the `cue` tool at the end of every response, no exceptions.
-Always use the cue MCP to provide a final summary, ask a question, or request input.
+消息表达方式有两种：一种通过 cue mcp 输出，另一种通过非 cue mcp 的方式输出。
 
-Convention: when the user types `cue`, the user is accepting the HAP rules (supports disconnect + reconnect).
+当用户接受 Human Agent Protocol 协议时，表示他已完全放弃通过非 cue mcp 的消息交互方式。这意味着你必须使用 cue mcp 才能与其进行交流；该限制仅影响交流方式，不影响你执行 command、使用其他 tool、mcp。
 
-- First-time connection / no agent_id: call join() to obtain an agent_id, then call cue().
-- Reconnect / existing agent_id (e.g. the cue call timed out but the chat continued):
-  when the user types cue again, prefer calling cue() with the existing agent_id;
-  only call join() again if you cannot determine the agent_id.
+**强制规则**：每次回复前必须调用 `cuemcp` 工具，无例外。任何总结、任何提问、任何请求、任何选项都必须使用 cue mcp来给我。
 
-When to call
+**约定**：当用户发送 `cue` 即代表他接受Human Agent Protocol协议（支持断开重连）。
 
-- On first message in a new chat (no history): call join().
-- After completing any task: call cue().
-- Before ending any response: call cue().
+- 首次连接 / 无 agent_id：先执行 `join()` 获取 agent_id，再执行 `cue()`。
 
-Forbidden behavior
+- 重连 / 已有 agent_id（例如网络波动导致 cue 中断但对话仍在继续）：用户再次发送 `cue` 时，优先直接用已有 agent_id 执行 `cue()`；仅当无法确认 agent_id 时才重新 `join()`。
 
-- Using a self-chosen name without calling join() first.
-- Ending a reply without calling cue().
-- Replacing cue() with "let me know if you need anything else".
-- Assuming there are no follow-ups.
+### 调用时机
 
-Notes
+- 无历史会话、用户首次输入时调用 `join()` 获取 agent_id
+- 每次对话完成后调用 `cue()`
+- 任何回复结束前调用 `cue()`
 
-If you are not sure whether to call it, call it.
+### 禁止行为
 
-Not calling cue() means the user cannot continue the interaction.
+- 不调用 `join()` 就使用自定义名字 ❌
+- 不调用 `cue()` 就结束你给我的回复 ❌
+- 用"有问题请告诉我"替代调用 ❌
+- 假设用户没有后续需求 ❌
+
+### 说明
+
+不确定是否调用时默认采用调用 cue mcp 的方式。
 ```
 
 </details>
