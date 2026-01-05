@@ -6,6 +6,7 @@ Communicates via a shared SQLite database
 import asyncio
 import uuid
 from pathlib import Path
+from datetime import datetime
 
 from fastmcp import FastMCP
 from fastmcp.server.middleware import Middleware, MiddlewareContext
@@ -119,11 +120,64 @@ async def wait_for_response(request_id: str, timeout: float = 600.0) -> CueRespo
                 return response
 
         # Check timeout
-        if asyncio.get_event_loop().time() - start_time > timeout:
+        if timeout is not None and asyncio.get_event_loop().time() - start_time > timeout:
             raise TimeoutError(f"Timed out waiting for response: {request_id}")
 
         # Retry after 500ms
         await asyncio.sleep(0.5)
+
+
+@mcp.tool()
+async def pause(agent_id: str, prompt: str | None = None) -> list[TextContent]:
+    """Pause the agent indefinitely until the user clicks Continue in the console.
+
+    This tool sends a single-action *confirm* payload (no cancel button) to cue-console.
+
+    Payload JSON format:
+        {
+          "type": "confirm",
+          "variant": "pause",
+          "text": "Paused. Click Continue when you are ready.",
+          "confirm_label": "Continue",
+          "cancel_label": ""
+        }
+    """
+    pause_prompt = prompt or "Waiting for your confirmation. Click Continue when you are ready."
+    payload = '{"type":"confirm","variant":"pause","text":"Paused. Click Continue when you are ready.","confirm_label":"Continue","cancel_label":""}'
+
+    request_id = f"req_{uuid.uuid4().hex[:12]}"
+    request = CueRequest(
+        request_id=request_id,
+        agent_id=agent_id,
+        prompt=pause_prompt,
+        payload=payload,
+    )
+
+    with Session(engine) as session:
+        session.add(request)
+        session.commit()
+
+
+    db_response = await wait_for_response(request_id, timeout=None)
+    if db_response.cancelled:
+        return [
+            TextContent(
+                type="text",
+                text=(
+                    "The user did not continue. Call pause(agent_id) to suspend and wait for resume.\n\n"
+                    + CUE_TODO_CONSTRAINT_TEXT
+                ),
+            )
+        ]
+
+    return [
+        TextContent(
+            type="text",
+            text=(
+                "The user resumed the conversation.\n\n" + CUE_TODO_CONSTRAINT_TEXT
+            ),
+        )
+    ]
 
 
 @mcp.tool()
@@ -190,15 +244,44 @@ async def cue(prompt: str, agent_id: str, payload: str | None = None) -> list[Te
         print(f"[MCP] Request created: {request_id}")
 
         # Wait for response
-        db_response = await wait_for_response(request_id)
+        try:
+            db_response = await wait_for_response(request_id)
+        except (asyncio.CancelledError, TimeoutError) as e:
+            with Session(engine) as session:
+                existing_response = session.exec(
+                    select(CueResponse).where(CueResponse.request_id == request_id)
+                ).first()
+                if not existing_response:
+                    response = CueResponse.create(
+                        request_id=request_id,
+                        response=UserResponse(text="", images=[]),
+                        cancelled=True,
+                    )
+                    session.add(response)
+
+                db_request = session.exec(
+                    select(CueRequest).where(CueRequest.request_id == request_id)
+                ).first()
+                if db_request:
+                    db_request.status = RequestStatus.CANCELLED
+                    db_request.updated_at = datetime.now()
+                    session.add(db_request)
+
+                session.commit()
+
+            msg = (
+                "Timed out waiting for user response. Call pause(agent_id) to suspend and wait for resume.\n\n"
+                if isinstance(e, TimeoutError)
+                else "Tool call was cancelled. Call pause(agent_id) to suspend and wait for resume.\n\n"
+            )
+            return [TextContent(type="text", text=msg)]
 
         if db_response.cancelled:
             return [
                 TextContent(
                     type="text",
                     text=(
-                        "The user chose to end the conversation. This session is now over.\n\n"
-                        + CUE_TODO_CONSTRAINT_TEXT
+                        "The user did not continue. Call pause(agent_id) to suspend and wait for resume.\n\n"
                     ),
                 )
             ]
@@ -207,11 +290,20 @@ async def cue(prompt: str, agent_id: str, payload: str | None = None) -> list[Te
         user_response = db_response.response
 
         if not user_response.text.strip() and not user_response.images:
+            with Session(engine) as session:
+                db_request = session.exec(
+                    select(CueRequest).where(CueRequest.request_id == request_id)
+                ).first()
+                if db_request:
+                    db_request.status = RequestStatus.COMPLETED
+                    db_request.updated_at = datetime.now()
+                    session.add(db_request)
+                    session.commit()
             return [
                 TextContent(
                     type="text",
                     text=(
-                        "The user chose to end the conversation. This session is now over.\n\n"
+                        "No user input received. Call pause(agent_id) to suspend and wait for resume.\n\n"
                         + CUE_TODO_CONSTRAINT_TEXT
                     ),
                 )

@@ -203,6 +203,13 @@ Then configure your MCP client to run:
 
 In the agent/runtime you want to use, type `cue` to trigger connect (or reconnect) and route the collaboration flow to `cue-console`.
 
+Install `cue-console`
+
+```bash
+npm install -g cue-console
+cue-console dev
+```
+
 ## How it works (the contract)
 
 ### Semantics

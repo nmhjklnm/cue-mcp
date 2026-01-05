@@ -1,6 +1,6 @@
 """SQLModel data models."""
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
 from typing import Optional
 
@@ -8,11 +8,12 @@ from pydantic import BaseModel
 from sqlmodel import Column, Field, SQLModel, Text
 
 
+ # Debug: 联调失败优先查调用是否到达/是否入库，不要先怀疑 status 大小写
 class RequestStatus(str, Enum):
     """Request status."""
-    PENDING = "pending"      # Waiting for client handling (cue-hub / simulator)
-    COMPLETED = "completed"   # Completed (has response)
-    CANCELLED = "cancelled"   # Cancelled
+    PENDING = "PENDING"      # Waiting for client handling (cue-hub / simulator)
+    COMPLETED = "COMPLETED"   # Completed (has response)
+    CANCELLED = "CANCELLED"   # Cancelled
 
 
 class ImageContent(BaseModel):
@@ -46,8 +47,8 @@ class CueRequest(SQLModel, table=True):
     prompt: str  # Message body shown to the user
     payload: Optional[str] = Field(default=None, sa_column=Column(Text))  # Optional structured payload (JSON string)
     status: RequestStatus = Field(default=RequestStatus.PENDING)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
 
 
 class CueResponse(SQLModel, table=True):
@@ -58,7 +59,7 @@ class CueResponse(SQLModel, table=True):
     request_id: str = Field(unique=True, index=True, foreign_key="cue_requests.request_id")
     response_json: str = Field(sa_column=Column(Text))  # JSON-serialized UserResponse
     cancelled: bool = Field(default=False)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=datetime.now)
 
     @property
     def response(self) -> UserResponse:
