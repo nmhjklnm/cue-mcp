@@ -4,6 +4,7 @@ _An MCP service on top of HAP (Human Agent Protocol) — compose humans and agen
 
 [![PyPI](https://img.shields.io/pypi/v/cuemcp?label=cuemcp&color=0B7285)](https://pypi.org/project/cuemcp/)
 [![Repo](https://img.shields.io/badge/repo-cue--mcp-111827)](https://github.com/nmhjklnm/cue-mcp)
+[![Repo: cue-stack](https://img.shields.io/badge/repo-cue--stack-111827)](https://github.com/nmhjklnm/cue-stack)
 ![License](https://img.shields.io/badge/license-Apache--2.0-1E40AF)
 
 ---
