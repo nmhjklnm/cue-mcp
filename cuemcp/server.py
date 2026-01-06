@@ -127,6 +127,28 @@ async def wait_for_response(request_id: str, timeout: float = 600.0) -> CueRespo
         await asyncio.sleep(0.5)
 
 
+def _build_tool_result_from_user_response(user_response: UserResponse) -> list[TextContent | ImageContent]:
+    result: list[TextContent | ImageContent] = []
+
+    # Add text
+    if user_response.text.strip():
+        result.append(
+            TextContent(
+                type="text",
+                text=f"用户希望继续，并提供了以下指令：\n\n{user_response.text.strip()}",
+            )
+        )
+    elif user_response.images:
+        result.append(TextContent(type="text", text="用户希望继续，并附加了图片："))
+
+    # Add images
+    for img in user_response.images:
+        result.append(ImageContent(type="image", data=img.base64_data, mimeType=img.mime_type))
+
+    result.append(TextContent(type="text", text=("\n\n" + CUE_TODO_CONSTRAINT_TEXT)))
+    return result
+
+
 @mcp.tool()
 async def pause(agent_id: str, prompt: str | None = None) -> list[TextContent]:
     """Pause the agent indefinitely until the user clicks Continue in the console.
@@ -170,14 +192,18 @@ async def pause(agent_id: str, prompt: str | None = None) -> list[TextContent]:
             )
         ]
 
-    return [
-        TextContent(
-            type="text",
-            text=(
-                "The user resumed the conversation.\n\n" + CUE_TODO_CONSTRAINT_TEXT
-            ),
-        )
-    ]
+    user_response = db_response.response
+    if not user_response.text.strip() and not user_response.images:
+        return [
+            TextContent(
+                type="text",
+                text=(
+                    "The user resumed the conversation.\n\n" + CUE_TODO_CONSTRAINT_TEXT
+                ),
+            )
+        ]
+
+    return _build_tool_result_from_user_response(user_response)
 
 
 @mcp.tool()
