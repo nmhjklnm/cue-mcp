@@ -275,3 +275,9 @@ uv run cuemcp
 
 - **PyPI**: [pypi.org/project/cuemcp](https://pypi.org/project/cuemcp/)
 - **Repo**: [github.com/nmhjklnm/cue-mcp](https://github.com/nmhjklnm/cue-mcp)
+
+---
+
+## QQ Group
+
+![QQ group QR code](./assets/qq.jpg)
