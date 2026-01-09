@@ -280,4 +280,4 @@ uv run cuemcp
 
 ## QQ Group
 
-![QQ group QR code](./assets/qq.jpg)
+<img src="./assets/qq.jpg" alt="QQ group QR code" width="25%" />
