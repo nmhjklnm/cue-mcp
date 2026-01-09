@@ -34,6 +34,7 @@ Assumptions:
 
 ### Notes
 
+- Versions prior to `v0.1.11` are no longer usable. Please upgrade to `v0.1.11+`.
 - The current version can occasionally disconnect (for example, the agent replies directly without calling `cue()` at the end).
 - If you get disconnected, type `cue` in the affected runtime to trigger auto-reconnect.
 
