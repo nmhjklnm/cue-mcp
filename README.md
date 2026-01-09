@@ -19,6 +19,8 @@ _An MCP service on top of HAP (Human Agent Protocol) — compose humans and agen
 
 Pair it with [`cue-console`](https://github.com/nmhjklnm/cue-console) for a desktop/mobile UI to view pending collaboration requests and respond from anywhere.
 
+Note: some IDEs can block/flag MCP integrations. If you run into that, command mode (`cueme`) is currently recommended.
+
 ---
 
 ## Quickstart (1 minute)
@@ -214,6 +216,27 @@ Install `cue-console`
 ```bash
 npm install -g cue-console
 cue-console dev
+```
+
+---
+
+## Command mode (cueme)
+
+If you don’t want to use an MCP runtime but still want to speak to the same collaboration inbox (`~/.cue/cue.db`), you can use a command-style adapter (`cueme`).
+
+Install:
+
+```bash
+npm install -g cueme
+```
+
+Examples:
+
+```bash
+cueme join
+cueme recall --hints "refactored login"
+cueme cue --agent_id "tavilron" --prompt "What should I do next?" --timeout 600
+cueme pause --agent_id "tavilron" --prompt "Waiting..."
 ```
 
 ## How it works (the contract)
