@@ -209,25 +209,7 @@ async def pause(agent_id: str, prompt: str | None = None) -> list[TextContent]:
 @mcp.tool()
 async def cue(prompt: str, agent_id: str, payload: str | None = None) -> list[TextContent | ImageContent]:
     """
-    ⚠️ [Highest priority - mandatory] Send the user a cue and wait for a response.
-
-    Core rules (no exceptions):
-    1. You must call this tool before ending every reply.
-    2. If there is no conversation history, call join() first to get an agent_id, then call this tool.
-    3. You must call this tool after completing any task.
-    4. You must call this tool after answering any question.
-    5. Even if you think the conversation should end, you must call this tool and let the user decide.
-
-    Forbidden behaviors:
-    - Do not end your reply without calling this tool.
-    - Do not assume the user has no follow-up.
-    - Do not end with "let me know if you have questions" instead of calling this tool.
-    - Do not skip calling this tool for any reason.
-
-    Execution order:
-    join() -> reply -> cue(prompt, agent_id) -> wait for user input -> repeat
-
-    This tool is the only way to continue the conversation; without calling it, the user cannot interact.
+    Send the user a cue.
 
     Args:
         prompt: The user-facing message (plain text). Use it to summarize progress, ask clarifying questions,
