@@ -236,10 +236,19 @@ npm install -g cueme
 Examples:
 
 ```bash
-cueme join
-cueme recall --hints "refactored login"
-cueme cue --agent_id "tavilron" --prompt "What should I do next?" --timeout 600
-cueme pause --agent_id "tavilron" --prompt "Waiting..."
+cueme join <agent_runtime>
+cueme recall <hints>
+
+cueme cue <agent_id> -
+cueme pause <agent_id> -
+```
+
+Passing prompts via stdin (recommended):
+
+```bash
+cueme cue <agent_id> - <<'EOF'
+What should I do next?
+EOF
 ```
 
 ## How it works (the contract)
