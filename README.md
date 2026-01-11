@@ -8,6 +8,7 @@ _An MCP service on top of HAP (Human Agent Protocol) — compose humans and agen
 
 [![Repo: cue-stack](https://img.shields.io/badge/repo-cue--stack-111827)](https://github.com/nmhjklnm/cue-stack)
 [![Repo: cue-console](https://img.shields.io/badge/repo-cue--console-111827)](https://github.com/nmhjklnm/cue-console)
+[![Repo: cue-command](https://img.shields.io/badge/repo-cue--command-111827)](https://github.com/nmhjklnm/cue-command)
 [![Repo: cue-mcp](https://img.shields.io/badge/repo-cue--mcp-111827)](https://github.com/nmhjklnm/cue-mcp)
 ![License](https://img.shields.io/badge/license-Apache--2.0-1E40AF)
 
@@ -217,7 +218,7 @@ Install `cue-console`
 
 ```bash
 npm install -g cue-console
-cue-console dev
+cue-console start
 ```
 
 ---

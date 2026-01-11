@@ -5,12 +5,14 @@ Communicates via a shared SQLite database
 """
 import asyncio
 import uuid
+import base64
 from pathlib import Path
 from datetime import datetime
 
 from fastmcp import FastMCP
 from fastmcp.server.middleware import Middleware, MiddlewareContext
 from mcp.types import TextContent, ImageContent
+from sqlalchemy import text
 from sqlmodel import Session, create_engine, select, SQLModel
 
 from .models import CueRequest, CueResponse, RequestStatus, UserResponse
@@ -30,6 +32,71 @@ CUE_TODO_CONSTRAINT_TEXT = (
 # Create engine
 engine = create_engine(DATABASE_URL, echo=False)
 SQLModel.metadata.create_all(engine)
+
+
+def _ensure_schema_v2_or_guide_migrate() -> None:
+    """Mode B: if an old DB exists, guide migrate and refuse to start."""
+    msg = (
+        "Database schema is outdated (pre-file storage). Please migrate: cueme migrate\n"
+        "数据库结构已过期（旧的 base64 存储）。请先执行：cueme migrate"
+    )
+
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "CREATE TABLE IF NOT EXISTS schema_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
+            )
+        )
+
+        version_row = conn.execute(
+            text("SELECT value FROM schema_meta WHERE key = :k"), {"k": "schema_version"}
+        ).fetchone()
+        version = str(version_row[0]) if version_row and version_row[0] is not None else ""
+        if version == "2":
+            return
+
+        req_count = conn.execute(text("SELECT COUNT(*) FROM cue_requests")).scalar() or 0
+        resp_count = conn.execute(text("SELECT COUNT(*) FROM cue_responses")).scalar() or 0
+        if int(req_count) == 0 and int(resp_count) == 0:
+            conn.execute(
+                text("INSERT INTO schema_meta (key, value) VALUES (:k, :v)"),
+                {"k": "schema_version", "v": "2"},
+            )
+            return
+
+    raise RuntimeError(msg)
+
+
+_ensure_schema_v2_or_guide_migrate()
+
+
+def _abs_path_from_file_ref(file_ref: str) -> Path:
+    # file_ref is stored as a rel path like "files/<sha>.<ext>".
+    clean = str(file_ref or "").lstrip("/")
+    return Path.home() / ".cue" / clean
+
+
+def _fetch_files_for_response_id(response_id: int) -> list[dict]:
+    if not response_id:
+        return []
+    sql = text(
+        """
+        SELECT f.file as file, f.mime_type as mime_type
+        FROM cue_response_files rf
+        JOIN cue_files f ON f.id = rf.file_id
+        WHERE rf.response_id = :rid
+        ORDER BY rf.idx ASC
+        """
+    )
+    with Session(engine) as session:
+        rows = session.exec(sql, {"rid": int(response_id)}).all()
+    out: list[dict] = []
+    for r in rows:
+        # SQLAlchemy row can be tuple-like
+        file_ref = r[0] if isinstance(r, (tuple, list)) else getattr(r, "file", "")
+        mime = r[1] if isinstance(r, (tuple, list)) else getattr(r, "mime_type", "")
+        out.append({"file": str(file_ref or ""), "mime_type": str(mime or "")})
+    return out
 
 # Create FastMCP server
 mcp = FastMCP("cue")
@@ -127,7 +194,7 @@ async def wait_for_response(request_id: str, timeout: float = 600.0) -> CueRespo
         await asyncio.sleep(0.5)
 
 
-def _build_tool_result_from_user_response(user_response: UserResponse) -> list[TextContent | ImageContent]:
+def _build_tool_result_from_user_response(user_response: UserResponse, files: list[dict]) -> list[TextContent | ImageContent]:
     result: list[TextContent | ImageContent] = []
 
     # Add text
@@ -138,12 +205,32 @@ def _build_tool_result_from_user_response(user_response: UserResponse) -> list[T
                 text=f"用户希望继续，并提供了以下指令：\n\n{user_response.text.strip()}",
             )
         )
-    elif user_response.images:
-        result.append(TextContent(type="text", text="用户希望继续，并附加了图片："))
+    elif files:
+        result.append(TextContent(type="text", text="用户希望继续，并附加了文件："))
 
-    # Add images
-    for img in user_response.images:
-        result.append(ImageContent(type="image", data=img.base64_data, mimeType=img.mime_type))
+    other_files: list[str] = []
+    for f in files:
+        mime = str(f.get("mime_type") or "")
+        file_ref = str(f.get("file") or "")
+        if not file_ref:
+            continue
+
+        if mime.lower().startswith("image/"):
+            p = _abs_path_from_file_ref(file_ref)
+            if not p.exists() or not p.is_file():
+                continue
+            try:
+                data = p.read_bytes()
+            except Exception:
+                continue
+            b64 = base64.b64encode(data).decode("utf-8")
+            result.append(ImageContent(type="image", data=b64, mimeType=mime or "image/png"))
+        else:
+            other_files.append(file_ref)
+
+    if other_files:
+        lines = "\n".join([f"- {x}" for x in other_files])
+        result.append(TextContent(type="text", text=f"\n\nAttachments:\n{lines}"))
 
     result.append(TextContent(type="text", text=("\n\n" + CUE_TODO_CONSTRAINT_TEXT)))
     return result
@@ -193,7 +280,8 @@ async def pause(agent_id: str, prompt: str | None = None) -> list[TextContent]:
         ]
 
     user_response = db_response.response
-    if not user_response.text.strip() and not user_response.images:
+    files = _fetch_files_for_response_id(int(db_response.id or 0))
+    if not user_response.text.strip() and not files:
         return [
             TextContent(
                 type="text",
@@ -203,7 +291,7 @@ async def pause(agent_id: str, prompt: str | None = None) -> list[TextContent]:
             )
         ]
 
-    return _build_tool_result_from_user_response(user_response)
+    return _build_tool_result_from_user_response(user_response, files)
 
 
 @mcp.tool()
@@ -262,7 +350,7 @@ async def cue(prompt: str, agent_id: str, payload: str | None = None) -> list[Te
                 if not existing_response:
                     response = CueResponse.create(
                         request_id=request_id,
-                        response=UserResponse(text="", images=[]),
+                        response=UserResponse(text=""),
                         cancelled=True,
                     )
                     session.add(response)
@@ -278,7 +366,7 @@ async def cue(prompt: str, agent_id: str, payload: str | None = None) -> list[Te
                 session.commit()
 
             msg = (
-                "Timed out waiting for user response. Call pause(agent_id) to suspend and wait for resume.\n\n"
+                "Timed out waiting for user response. You MUST NOT continue or add any extra output. Immediately call pause(agent_id) and stop output until resumed.\n\n"
                 if isinstance(e, TimeoutError)
                 else "Tool call was cancelled. Call pause(agent_id) to suspend and wait for resume.\n\n"
             )
@@ -288,16 +376,15 @@ async def cue(prompt: str, agent_id: str, payload: str | None = None) -> list[Te
             return [
                 TextContent(
                     type="text",
-                    text=(
-                        "The user did not continue. Call pause(agent_id) to suspend and wait for resume.\n\n"
-                    ),
+                    text="The user did not continue. Call pause(agent_id) to suspend and wait for resume.\n\n",
                 )
             ]
 
         # Parse response
         user_response = db_response.response
+        files = _fetch_files_for_response_id(int(db_response.id or 0))
 
-        if not user_response.text.strip() and not user_response.images:
+        if not user_response.text.strip() and not files:
             with Session(engine) as session:
                 db_request = session.exec(
                     select(CueRequest).where(CueRequest.request_id == request_id)
@@ -318,27 +405,7 @@ async def cue(prompt: str, agent_id: str, payload: str | None = None) -> list[Te
             ]
 
         # Build result
-        result = []
-
-        # Add text
-        if user_response.text.strip():
-            result.append(TextContent(type="text", text=f"用户希望继续，并提供了以下指令：\n\n{user_response.text.strip()}"))
-        elif user_response.images:
-            result.append(TextContent(type="text", text="用户希望继续，并附加了图片："))
-
-        # Add images
-        for img in user_response.images:
-            result.append(ImageContent(type="image", data=img.base64_data, mimeType=img.mime_type))
-
-        result.append(
-            TextContent(
-                type="text",
-                text=(
-                    "\n\n" + CUE_TODO_CONSTRAINT_TEXT
-                ),
-            )
-        )
-        return result
+        return _build_tool_result_from_user_response(user_response, files)
 
     except Exception as e:
         return [TextContent(type="text", text=f"Error: {str(e)}")]
